@@ -113,7 +113,6 @@ func (aviLogger AviLogger) WithValues(keysAndValues ...interface{}) logr.LogSink
 func (aviLogger AviLogger) WithName(name string) logr.LogSink {
 	_ = aviLogger.sugar.Named(name)
 	return &aviLogger
-
 }
 
 // log file sample name /log/ako-12345.avi.log
@@ -139,7 +138,7 @@ var AviLog AviLogger
 func init() {
 	atom := zap.NewAtomicLevel()
 	// default level set to Info
-	atom.SetLevel(InfoLevel)
+	atom.SetLevel(DebugLevel)
 
 	var file *os.File
 	var logpath string
@@ -168,7 +167,7 @@ func init() {
 	encoderCfg.EncodeLevel = zapcore.CapitalLevelEncoder
 	logpath = getFileName()
 	file, err = os.OpenFile(logpath,
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		panic(err)
 	}
