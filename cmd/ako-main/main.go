@@ -59,7 +59,6 @@ var (
 )
 
 func main() {
-
 	InitializeAKOApi()
 
 	InitializeAKC()
@@ -101,7 +100,7 @@ func InitializeAKC() {
 
 	// Initialize akoControlConfig
 	akoControlConfig := lib.AKOControlConfig()
-	//Used to set vrf context, static routes
+	// Used to set vrf context, static routes
 	isPrimaryAKO, err := strconv.ParseBool(os.Getenv("PRIMARY_AKO_FLAG"))
 	if err != nil {
 		isPrimaryAKO = true
@@ -355,7 +354,6 @@ func InitializeAKC() {
 		utils.AviLog.Warnf("Timed out while waiting for threads to return, going to stop AKO. Time waited 60 seconds")
 		return
 	}
-
 }
 
 func init() {
@@ -404,7 +402,6 @@ func istioWatcherEvents(watcher *fsnotify.Watcher, kc *kubernetes.Clientset, ist
 }
 
 func initIstioSecrets(kc *kubernetes.Clientset, istioUpdateCh *chan struct{}) {
-
 	entries, err := os.ReadDir(lib.IstioCertOutputPath + "/")
 	if err != nil {
 		utils.AviLog.Warnf("Cannot read %s, error: %s", lib.IstioCertOutputPath, err.Error())

@@ -136,12 +136,14 @@ deps:
 # docker images
 .PHONY: docker
 docker: glob-vars
-	sudo docker build \
-	-t $(BINARY_NAME_AKO):latest \
+	docker build \
+	--platform=linux/amd64 \
+	-t ghcr.io/sunjaybhatia/ako:1.12.2 \
 	--label "BUILD_TAG=$(BUILD_TAG)" \
 	--label "BUILD_TIME=$(BUILD_TIME)" \
 	$(BUILD_ARG_GOLANG) $(BUILD_ARG_PHOTON) $(BUILD_ARG_AKO_LDFLAGS) \
 	-f Dockerfile.ako .
+	docker push ghcr.io/sunjaybhatia/ako:1.12.2
 
 .PHONY: ako-infra-docker
 ako-infra-docker: glob-vars

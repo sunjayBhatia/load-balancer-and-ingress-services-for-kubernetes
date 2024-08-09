@@ -70,7 +70,6 @@ func (avisess *AviSession) PostMultipartWafAppSignatureObjectRequest(fileLocPtr 
 
 // PostMultipartRequest performs a POST API call and uploads multipart data to API fileobject/upload
 func (avisess *AviSession) PostMultipartFileObjectRequest(fileLocPtr *os.File, tenant string, fileParams map[string]string) error {
-
 	url := avisess.prefix + "/api/fileobject/upload"
 	return avisess.restMultipartFileObjectUploadRequest("POST", fileLocPtr, url, nil, 0, tenant, fileParams)
 }
@@ -79,8 +78,8 @@ func (avisess *AviSession) PostMultipartFileObjectRequest(fileLocPtr *os.File, t
 // POST to upload a file.
 // Return status of multipart upload.
 func (avisess *AviSession) restMultipartFileObjectUploadRequest(verb string, filePathPtr *os.File, url string,
-	lastErr error, retryNum int, tenant string, fileParams map[string]string) error {
-
+	lastErr error, retryNum int, tenant string, fileParams map[string]string,
+) error {
 	if errorResult := avisess.checkRetryForSleep(retryNum, verb, url, lastErr); errorResult != nil {
 		return errorResult
 	}
@@ -89,7 +88,7 @@ func (avisess *AviSession) restMultipartFileObjectUploadRequest(verb string, fil
 	}
 
 	errorResult := AviError{Verb: verb, Url: url}
-	//Prepare a file that you will submit to an URL.
+	// Prepare a file that you will submit to an URL.
 	values := map[string]io.Reader{
 		"file": filePathPtr,
 	}
@@ -146,7 +145,7 @@ func (avisess *AviSession) restMultipartFileObjectUploadRequest(verb string, fil
 
 	errorResult.HttpStatusCode = resp.StatusCode
 	avisess.collectCookiesFromResp(resp)
-	glog.Infof("Response code: %v", resp.StatusCode)
+	glog.Errorf("Response code: %v", resp.StatusCode)
 
 	retryReq := false
 	if resp.StatusCode == 401 && len(avisess.sessionid) != 0 {
@@ -159,7 +158,7 @@ func (avisess *AviSession) restMultipartFileObjectUploadRequest(verb string, fil
 	} else if resp.StatusCode == 419 || (resp.StatusCode >= 500 && resp.StatusCode < 599) {
 		resp.Body.Close()
 		retryReq = true
-		glog.Infof("Retrying %d due to Status Code %d", retryNum, resp.StatusCode)
+		glog.Errorf("Retrying %d due to Status Code %d", retryNum, resp.StatusCode)
 	}
 
 	if retryReq {
@@ -179,7 +178,7 @@ func (avisess *AviSession) restMultipartFileObjectUploadRequest(verb string, fil
 		bres, berr := ioutil.ReadAll(resp.Body)
 		if berr == nil {
 			mres, _ := convertAviResponseToMapInterface(bres)
-			glog.Infof("Error resp: %v", mres)
+			glog.Errorf("Error resp: %v", mres)
 			emsg := fmt.Sprintf("%v", mres)
 			errorResult.Message = &emsg
 		}
@@ -295,12 +294,14 @@ type AviSession struct {
 	CSP_ACCESS_TOKEN string
 }
 
-const DEFAULT_AVI_VERSION = "18.2.6"
-const DEFAULT_API_TIMEOUT = time.Duration(60 * time.Second)
-const DEFAULT_API_TENANT = "admin"
-const DEFAULT_MAX_API_RETRIES = 3
-const DEFAULT_API_RETRY_INTERVAL = 500
-const DEFAULT_CSP_HOST = "console.cloud.vmware.com"
+const (
+	DEFAULT_AVI_VERSION        = "18.2.6"
+	DEFAULT_API_TIMEOUT        = time.Duration(60 * time.Second)
+	DEFAULT_API_TENANT         = "admin"
+	DEFAULT_MAX_API_RETRIES    = 3
+	DEFAULT_API_RETRY_INTERVAL = 500
+	DEFAULT_CSP_HOST           = "console.cloud.vmware.com"
+)
 
 // NewAviSession initiates a session to AviController and returns it
 func NewAviSession(host string, username string, options ...func(*AviSession) error) (*AviSession, error) {
@@ -435,6 +436,7 @@ func (avisess *AviSession) getCSPAccessToken() error {
 }
 
 func (avisess *AviSession) initiateSession() error {
+	glog.Errorf("initiating avi session")
 	if avisess.insecure == true {
 		glog.Warning("Strict certificate verification is *DISABLED*")
 	}
@@ -456,7 +458,7 @@ func (avisess *AviSession) initiateSession() error {
 	// initiate http session here
 	// first set the csrf token
 	var res interface{}
-	//rerror := avisess.Get("", res)
+	// rerror := avisess.Get("", res)
 
 	// now login to get session_id, csrfToken
 	cred := make(map[string]string)
@@ -474,9 +476,9 @@ func (avisess *AviSession) initiateSession() error {
 		return rerror
 	}
 
-	glog.Infof("response: %v", res)
+	glog.Errorf("response: %v", res)
 	if res != nil && reflect.TypeOf(res).Kind() != reflect.String {
-		glog.Infof("results: %v error %v", res.(map[string]interface{}), rerror)
+		glog.Errorf("results: %v error %v", res.(map[string]interface{}), rerror)
 	}
 
 	return nil
@@ -718,6 +720,7 @@ func (avisess *AviSession) checkRetryForSleep(retry int, verb string, url string
 }
 
 func (avisess *AviSession) newAviRequest(verb string, url string, payload io.Reader, tenant string) (*http.Request, AviError) {
+	glog.Errorf("creating %s request for url %s", verb, url)
 	req, err := http.NewRequest(verb, url, payload)
 	errorResult := AviError{Verb: verb, Url: url}
 	if err != nil {
@@ -735,7 +738,7 @@ func (avisess *AviSession) newAviRequest(verb string, url string, payload io.Rea
 		}
 	}
 
-	//req.Header.Set("Accept", "application/json")
+	// req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Avi-Version", avisess.version)
 	if tenant == "" {
 		tenant = avisess.tenant
@@ -743,6 +746,7 @@ func (avisess *AviSession) newAviRequest(verb string, url string, payload io.Rea
 	if !strings.HasSuffix(url, "login") && avisess.csrfToken != "" {
 		req.Header["X-CSRFToken"] = []string{avisess.csrfToken}
 		req.AddCookie(&http.Cookie{Name: "csrftoken", Value: avisess.csrfToken})
+		glog.Errorf("adding csrftken cookie value to request: %s", avisess.csrfToken)
 	}
 	if avisess.prefix != "" {
 		req.Header.Set("Referer", avisess.prefix)
@@ -754,6 +758,7 @@ func (avisess *AviSession) newAviRequest(verb string, url string, payload io.Rea
 	if !strings.HasSuffix(url, "login") && avisess.sessionid != "" {
 		req.AddCookie(&http.Cookie{Name: "sessionid", Value: avisess.sessionid})
 		req.AddCookie(&http.Cookie{Name: "avi-sessionid", Value: avisess.sessionid})
+		glog.Errorf("adding sessionid cookie value to request: %s", avisess.sessionid)
 	}
 	return req, errorResult
 }
@@ -767,13 +772,18 @@ func (avisess *AviSession) collectCookiesFromResp(resp *http.Response) {
 	avisess.cookiesCollectLock.Lock()
 	defer avisess.cookiesCollectLock.Unlock()
 
+	glog.Error("extracting csrftoken and sessionid from resp")
+	defer glog.Error("done extracting csrftoken and sessionid from resp")
+
 	var csrfToken string
 	var sessionID string
 	for _, cookie := range resp.Cookies() {
 		if cookie.Name == "csrftoken" {
+			glog.Errorf("csrftoken cookie: %s, expires: %s, maxage: %d (raw %s)", cookie.Value, cookie.Expires, cookie.MaxAge, cookie.Raw)
 			csrfToken = cookie.Value
 		}
 		if cookie.Name == "sessionid" || cookie.Name == "avi-sessionid" {
+			glog.Errorf("sessionid cookie: %s, expires: %s, maxage: %d (raw %s)", cookie.Value, cookie.Expires, cookie.MaxAge, cookie.Raw)
 			sessionID = cookie.Value
 		}
 	}
@@ -786,7 +796,8 @@ func (avisess *AviSession) collectCookiesFromResp(resp *http.Response) {
 // RestRequest exports restRequest from the SDK
 // Returns http.Response for accessing the whole http Response struct including headers and response body
 func (avisess *AviSession) RestRequest(verb string, uri string, payload interface{}, tenant string, lastError error,
-	retryNum ...int) (*http.Response, error) {
+	retryNum ...int,
+) (*http.Response, error) {
 	return avisess.restRequest(verb, uri, payload, tenant, nil)
 }
 
@@ -794,7 +805,9 @@ func (avisess *AviSession) RestRequest(verb string, uri string, payload interfac
 // Returns http.Response if successful
 // Note: The caller of the function is responsible for doing resp.Body.Close()
 func (avisess *AviSession) restRequest(verb string, uri string, payload interface{}, tenant string, lastError error,
-	retryNum ...int) (*http.Response, error) {
+	retryNum ...int,
+) (*http.Response, error) {
+	glog.Errorf("making rest request %s to %s", verb, uri)
 	url := avisess.prefix + uri
 	// If optional retryNum arg is provided, then count which retry number this is
 	retry := 0
@@ -845,15 +858,19 @@ func (avisess *AviSession) restRequest(verb string, uri string, payload interfac
 		}
 	}
 	if !retryReq {
-		glog.Infof("Req for %s uri %v tenant %s RespCode %v", verb, url, tenant, resp.StatusCode)
+		glog.Errorf("Req for %s uri %v tenant %s RespCode %v", verb, url, tenant, resp.StatusCode)
 		errorResult.HttpStatusCode = resp.StatusCode
+
+		for _, cookie := range resp.Cookies() {
+			glog.Errorf("cookie: %v", cookie.Raw)
+		}
 
 		if uri == "login" {
 			avisess.collectCookiesFromResp(resp)
 		}
 		if resp.StatusCode == 401 && uri != "login" {
 			resp.Body.Close()
-			glog.Infof("Retrying url %s; retry %d due to Status Code %d", url, retry, resp.StatusCode)
+			glog.Errorf("Retrying url %s; retry %d due to Status Code %d", url, retry, resp.StatusCode)
 			err := avisess.initiateSession()
 			if err != nil {
 				return nil, err
@@ -867,7 +884,7 @@ func (avisess *AviSession) restRequest(verb string, uri string, payload interfac
 		} else if resp.StatusCode >= 500 && resp.StatusCode < 599 {
 			resp.Body.Close()
 			retryReq = true
-			glog.Infof("Retrying url: %s; retry: %d due to Status Code %d", url, retry, resp.StatusCode)
+			glog.Errorf("Retrying url: %s; retry: %d due to Status Code %d", url, retry, resp.StatusCode)
 		}
 	}
 	if retryReq {
@@ -875,7 +892,7 @@ func (avisess *AviSession) restRequest(verb string, uri string, payload interfac
 			check, httpResp, err := avisess.CheckControllerStatus()
 			if check == false {
 				if resp != nil && resp.Body != nil {
-					glog.Infof("Body is not nil, close it.")
+					glog.Errorf("Body is not nil, close it.")
 					resp.Body.Close()
 				}
 				glog.Errorf("restRequest Error during checking controller state. Error: %s", err)
@@ -883,7 +900,7 @@ func (avisess *AviSession) restRequest(verb string, uri string, payload interfac
 			}
 			if err := avisess.initiateSession(); err != nil {
 				if resp != nil && resp.Body != nil {
-					glog.Infof("Body is not nil, close it.")
+					glog.Errorf("Body is not nil, close it.")
 					resp.Body.Close()
 				}
 				return nil, err
@@ -926,7 +943,7 @@ func (avisess *AviSession) fetchBody(verb, uri string, resp *http.Response) (res
 	if err == nil {
 		if resp.StatusCode < 200 || resp.StatusCode > 299 || resp.StatusCode == 500 {
 			mres, merr := convertAviResponseToMapInterface(result)
-			glog.Infof("Error code %v parsed resp: %v err %v",
+			glog.Errorf("Error code %v parsed resp: %v err %v",
 				resp.StatusCode, mres, merr)
 			emsg := fmt.Sprintf("%v", mres)
 			errorResult.Message = &emsg
@@ -944,7 +961,8 @@ func (avisess *AviSession) fetchBody(verb, uri string, resp *http.Response) (res
 // restMultipartUploadRequest makes a REST request to the Avi Controller's REST API using POST to upload a file.
 // Return status of multipart upload.
 func (avisess *AviSession) restMultipartUploadRequest(verb string, uri string, file_path_ptr *os.File, tenant string, lastErr error,
-	retryNum ...int) error {
+	retryNum ...int,
+) error {
 	url := avisess.prefix + "/api/fileservice/" + uri
 
 	// If optional retryNum arg is provided, then count which retry number this is
@@ -962,7 +980,7 @@ func (avisess *AviSession) restMultipartUploadRequest(verb string, uri string, f
 	}
 
 	errorResult := AviError{Verb: verb, Url: url}
-	//Prepare a file that you will submit to an URL.
+	// Prepare a file that you will submit to an URL.
 	values := map[string]io.Reader{
 		"file": file_path_ptr,
 	}
@@ -1018,7 +1036,7 @@ func (avisess *AviSession) restMultipartUploadRequest(verb string, uri string, f
 
 	errorResult.HttpStatusCode = resp.StatusCode
 	avisess.collectCookiesFromResp(resp)
-	glog.Infof("Response code: %v", resp.StatusCode)
+	glog.Errorf("Response code: %v", resp.StatusCode)
 
 	retryReq := false
 	if resp.StatusCode == 401 && len(avisess.sessionid) != 0 && uri != "login" {
@@ -1031,7 +1049,7 @@ func (avisess *AviSession) restMultipartUploadRequest(verb string, uri string, f
 	} else if resp.StatusCode == 419 || (resp.StatusCode >= 500 && resp.StatusCode < 599) {
 		resp.Body.Close()
 		retryReq = true
-		glog.Infof("Retrying %d due to Status Code %d", retry, resp.StatusCode)
+		glog.Errorf("Retrying %d due to Status Code %d", retry, resp.StatusCode)
 	}
 
 	if retryReq {
@@ -1051,7 +1069,7 @@ func (avisess *AviSession) restMultipartUploadRequest(verb string, uri string, f
 		bres, berr := ioutil.ReadAll(resp.Body)
 		if berr == nil {
 			mres, _ := convertAviResponseToMapInterface(bres)
-			glog.Infof("Error resp: %v", mres)
+			glog.Errorf("Error resp: %v", mres)
 			emsg := fmt.Sprintf("%v", mres)
 			errorResult.Message = &emsg
 		}
@@ -1101,7 +1119,7 @@ func (avisess *AviSession) restMultipartDownloadRequest(verb string, uri string,
 
 	errorResult.HttpStatusCode = resp.StatusCode
 	avisess.collectCookiesFromResp(resp)
-	glog.Infof("Response code: %v", resp.StatusCode)
+	glog.Errorf("Response code: %v", resp.StatusCode)
 
 	retryReq := false
 	if resp.StatusCode == 401 && len(avisess.sessionid) != 0 && uri != "login" {
@@ -1114,7 +1132,7 @@ func (avisess *AviSession) restMultipartDownloadRequest(verb string, uri string,
 	} else if resp.StatusCode == 419 || (resp.StatusCode >= 500 && resp.StatusCode < 599) {
 		resp.Body.Close()
 		retryReq = true
-		glog.Infof("Retrying %d due to Status Code %d", retry, resp.StatusCode)
+		glog.Errorf("Retrying %d due to Status Code %d", retry, resp.StatusCode)
 	}
 
 	if retryReq {
@@ -1138,7 +1156,7 @@ func (avisess *AviSession) restMultipartDownloadRequest(verb string, uri string,
 		bres, berr := ioutil.ReadAll(resp.Body)
 		if berr == nil {
 			mres, _ := convertAviResponseToMapInterface(bres)
-			glog.Infof("Error resp: %v", mres)
+			glog.Errorf("Error resp: %v", mres)
 			emsg := fmt.Sprintf("%v", mres)
 			errorResult.Message = &emsg
 		}
@@ -1177,7 +1195,7 @@ func removeSensitiveFields(data []byte) []byte {
 func debug(data []byte, err error) {
 	if err == nil {
 		data = removeSensitiveFields(data)
-		glog.Infof("%s\n\n", data)
+		glog.Errorf("%s\n\n", data)
 	} else {
 		glog.Errorf("%s\n\n", err)
 	}
@@ -1194,15 +1212,15 @@ func (avisess *AviSession) CheckControllerStatus() (bool, *http.Response, error)
 			glog.Errorf("CheckControllerStatus Error %v while generating http request.", err)
 			return false, nil, err
 		}
-		//Getting response from controller's API
+		// Getting response from controller's API
 		if stateResp, err := avisess.client.Do(checkReq); err == nil {
 			defer stateResp.Body.Close()
-			//Checking controller response
+			// Checking controller response
 			if stateResp.StatusCode != 503 && stateResp.StatusCode != 502 && stateResp.StatusCode != 500 {
 				isControllerUp = true
 				break
 			} else {
-				glog.Infof("CheckControllerStatus Error while generating http request %d %v",
+				glog.Errorf("CheckControllerStatus Error while generating http request %d %v",
 					stateResp.StatusCode, err)
 			}
 		} else {
@@ -1230,7 +1248,8 @@ func getMinTimeDuration(durationFirst, durationSecond time.Duration) time.Durati
 }
 
 func (avisess *AviSession) restRequestInterfaceResponse(verb string, url string,
-	payload interface{}, response interface{}, options ...ApiOptionsParams) error {
+	payload interface{}, response interface{}, options ...ApiOptionsParams,
+) error {
 	opts, err := getOptions(options)
 	if err != nil {
 		return err
@@ -1272,9 +1291,9 @@ func (avisess *AviSession) Put(uri string, payload interface{}, response interfa
 // Post issues a PATCH request against the avisess REST API.
 // allowed patchOp - add, replace, remove
 func (avisess *AviSession) Patch(uri string, payload interface{}, patchOp string, response interface{}, options ...ApiOptionsParams) error {
-	var patchPayload = make(map[string]interface{})
+	patchPayload := make(map[string]interface{})
 	patchPayload[patchOp] = payload
-	glog.Infof(" PATCH OP %v data %v", patchOp, payload)
+	glog.Errorf(" PATCH OP %v data %v", patchOp, payload)
 	return avisess.restRequestInterfaceResponse("PATCH", uri, patchPayload, response, options...)
 }
 
@@ -1575,7 +1594,6 @@ func (avisess *AviSession) GetObject(obj string, options ...ApiOptionsParams) er
 		return err
 	}
 	return json.Unmarshal(elems[0], &opts.result)
-
 }
 
 // GetObjectByName performs GET with name filter
